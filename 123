@@ -1,16 +1,699 @@
+/*
+ * 自動Toの言語表示順。
+ *
+ * Bot君总代碼のprintOrderから、
+ * Division名・サポート・CS管理等を除いた言語チームのみ。
+ *
+ * task.teamsに存在し、かつ対象になっている言語だけが出力される。
+ */
+const TENKAI_LANGUAGE_TEAM_ORDER_20260728V2_ = [
+  '繁体字',
+  '韓国語',
+  '簡体字',
+  'タイ語',
+  'アラビア語',
+
+  'ドイツ語',
+  'フランス語',
+  'スペイン語',
+  'イタリア語',
+  'ポルトガル語',
+
+  '英語'
+];
+
+
 // create messages
 // function called from the client side (see clientScript)
-function getTenkaiParams () {
+function getTenkaiParams() {
   console.warn('LOADING TENKAI PARAMS');
   console.time('Loading message');
 
-  let botKun = BotKun.summon(magicIncantation)
-  botKun.loadProject()
+  const botKun =
+    BotKun.summon(magicIncantation);
 
-  let parameters = botKun.pj.tenkai.makeTenkaiParams(3)
+  botKun.loadProject();
 
-  console.log(parameters)
+  /*
+   * 新しいSheetの標準展開処理をそのまま使用する。
+   */
+  const rawParameters =
+    botKun.pj.tenkai.makeTenkaiParams(3);
 
-  console.timeEnd('Loading message')
-  return JSON.stringify(parameters)
+  let parameters = rawParameters;
+
+  /*
+   * 念のため、戻り値がJSON文字列だった場合にも対応する。
+   */
+  if (typeof rawParameters === 'string') {
+    try {
+      parameters =
+        JSON.parse(rawParameters);
+    }
+    catch (error) {
+      console.warn(
+        'makeTenkaiParamsの戻り値をJSONとして解析できませんでした。',
+        error
+      );
+
+      console.timeEnd('Loading message');
+
+      /*
+       * 既にJSON文字列の場合は、そのまま返す。
+       */
+      return rawParameters;
+    }
+  }
+
+  /*
+   * To整形で問題が発生しても、
+   * 元の展開処理自体は停止させない。
+   */
+  try {
+    formatTenkaiAutomaticTosByLanguage_20260728V2_(
+      parameters,
+      botKun
+    );
+  }
+  catch (error) {
+    console.error(
+      '自動Toの言語別整形中にエラーが発生しました。元の展開結果を返します。',
+      error && error.stack
+        ? error.stack
+        : error
+    );
+  }
+
+  console.log(
+    'FINAL TENKAI PARAMETERS = ' +
+    JSON.stringify(
+      parameters,
+      null,
+      2
+    )
+  );
+
+  console.timeEnd('Loading message');
+
+  return JSON.stringify(parameters);
+}
+
+
+/**
+ * makeTenkaiParamsで生成された各task.messageについて、
+ * 先頭の自動Toを言語別の表示へ差し替える。
+ */
+function formatTenkaiAutomaticTosByLanguage_20260728V2_(
+  parameters,
+  botKun
+) {
+  if (
+    !parameters ||
+    !Array.isArray(parameters.tasks)
+  ) {
+    console.warn(
+      'parameters.tasksが取得できないため、To整形をスキップします。',
+      parameters
+    );
+
+    return;
+  }
+
+  const config =
+    botKun &&
+    botKun.pj &&
+    botKun.pj.config &&
+    botKun.pj.config.data
+      ? botKun.pj.config.data
+      : {};
+
+  /*
+   * 設定で自動Toが明示的に無効の場合は処理しない。
+   * undefinedの場合は処理を続行する。
+   */
+  if (config.tenkaiAutomaticTo === false) {
+    console.log(
+      'tenkaiAutomaticToが無効のため、To整形をスキップします。'
+    );
+
+    return;
+  }
+
+  const roomId =
+    getTenkaiRoomId_20260728V2_(
+      parameters,
+      config
+    );
+
+  if (
+    roomId == null ||
+    roomId === ''
+  ) {
+    console.warn(
+      '展開先のroomIdが取得できないため、To整形をスキップします。',
+      {
+        configRoom: config.room,
+        parametersRoom: parameters.room
+      }
+    );
+
+    return;
+  }
+
+  /*
+   * 複数言語チームに同じメンバーが登録されている場合の
+   * 重複Toを防止する。
+   */
+  const usedCwIds = {};
+
+  parameters.tasks.forEach(
+    function (task, taskIndex) {
+      if (
+        !task ||
+        typeof task !== 'object'
+      ) {
+        console.warn(
+          `tasks[${taskIndex}]が不正です。`,
+          task
+        );
+
+        return;
+      }
+
+      if (
+        task.message == null
+      ) {
+        console.warn(
+          `tasks[${taskIndex}].messageが取得できません。`
+        );
+
+        return;
+      }
+
+      if (
+        !task.teams ||
+        typeof task.teams !== 'object' ||
+        Array.isArray(task.teams)
+      ) {
+        console.warn(
+          `tasks[${taskIndex}].teamsが取得できません。`,
+          task.teams
+        );
+
+        return;
+      }
+
+      /*
+       * 今回の依頼で対象になっている言語チームだけを取得する。
+       */
+      const languageGroups =
+        getConcernedLanguageGroups_20260728V2_(
+          task.teams
+        );
+
+      console.log(
+        `TASK ${taskIndex + 1} TARGET LANGUAGE GROUPS =`,
+        JSON.stringify(
+          languageGroups,
+          null,
+          2
+        )
+      );
+
+      if (languageGroups.length === 0) {
+        console.warn(
+          `TASK ${taskIndex + 1}には対象言語チームがありません。`
+        );
+
+        return;
+      }
+
+      /*
+       * 1言語1行のToを生成する。
+       */
+      const formattedTos =
+        makeGroupedAutomaticTos_20260728V2_(
+          botKun,
+          roomId,
+          languageGroups,
+          usedCwIds
+        );
+
+      if (
+        formattedTos == null ||
+        String(formattedTos).trim() === ''
+      ) {
+        console.warn(
+          `TASK ${taskIndex + 1}のToを生成できませんでした。`
+        );
+
+        return;
+      }
+
+      /*
+       * 標準処理で付与された先頭の自動Toを削除する。
+       */
+      const messageBody =
+        removeLeadingAutomaticTos_20260728V2_(
+          String(task.message)
+        );
+
+      /*
+       * 言語別To＋元の本文に差し替える。
+       */
+      task.message =
+        formattedTos + messageBody;
+    }
+  );
+}
+
+
+/**
+ * 展開先のChatwork roomIdを取得する。
+ */
+function getTenkaiRoomId_20260728V2_(
+  parameters,
+  config
+) {
+  const roomCandidates = [
+    config ? config.room : null,
+    parameters ? parameters.room : null
+  ];
+
+  for (
+    let index = 0;
+    index < roomCandidates.length;
+    index++
+  ) {
+    const room =
+      roomCandidates[index];
+
+    if (
+      room == null ||
+      room === ''
+    ) {
+      continue;
+    }
+
+    /*
+     * roomId自体が数値・文字列の場合。
+     */
+    if (
+      typeof room === 'number' ||
+      typeof room === 'string'
+    ) {
+      return room;
+    }
+
+    /*
+     * roomがオブジェクトの場合。
+     */
+    if (
+      typeof room === 'object'
+    ) {
+      if (
+        room.id != null &&
+        room.id !== ''
+      ) {
+        return room.id;
+      }
+
+      if (
+        room.room_id != null &&
+        room.room_id !== ''
+      ) {
+        return room.room_id;
+      }
+    }
+  }
+
+  return null;
+}
+
+
+/**
+ * task.teamsから、
+ * 今回の依頼で対象になっている言語チームだけを取得する。
+ *
+ * Division名・サポート・CS管理・BNE等は対象外。
+ */
+function getConcernedLanguageGroups_20260728V2_(
+  teams
+) {
+  if (
+    !teams ||
+    typeof teams !== 'object' ||
+    Array.isArray(teams)
+  ) {
+    return [];
+  }
+
+  const languageGroups = [];
+
+  TENKAI_LANGUAGE_TEAM_ORDER_20260728V2_
+    .forEach(function (languageTeamName) {
+      /*
+       * task.teamsに存在しない言語は対象外。
+       */
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          teams,
+          languageTeamName
+        )
+      ) {
+        return;
+      }
+
+      const status =
+        teams[languageTeamName];
+
+      /*
+       * 従来仕様：
+       * statusが空欄のチームを今回の対象とする。
+       */
+      const isTarget =
+        status == null ||
+        String(status).trim() === '';
+
+      if (!isTarget) {
+        return;
+      }
+
+      /*
+       * 1言語につき1グループとして登録する。
+       */
+      languageGroups.push({
+        languageKey: languageTeamName,
+        teams: [languageTeamName]
+      });
+    });
+
+  return languageGroups;
+}
+
+
+/**
+ * 言語チームごとに自動Toを取得し、
+ * 1言語1行で表示する。
+ */
+function makeGroupedAutomaticTos_20260728V2_(
+  botKun,
+  roomId,
+  languageGroups,
+  usedCwIds
+) {
+  if (
+    !Array.isArray(languageGroups) ||
+    languageGroups.length === 0
+  ) {
+    return '';
+  }
+
+  const lines = [];
+
+  languageGroups.forEach(
+    function (group) {
+      let originalTos = '';
+
+      try {
+        /*
+         * 1言語ずつ指定することで、
+         * 言語単位のToを取得する。
+         */
+        originalTos =
+          botKun.cw.rooms.getTeamsTos(
+            roomId,
+            group.teams
+          );
+      }
+      catch (error) {
+        console.warn(
+          `「${group.languageKey}」のTo取得に失敗しました。`,
+          error
+        );
+
+        return;
+      }
+
+      const formattedLine =
+        formatAutomaticTosUsingMembers_20260728V2_(
+          originalTos,
+          botKun,
+          usedCwIds
+        );
+
+      if (
+        formattedLine != null &&
+        String(formattedLine).trim() !== ''
+      ) {
+        lines.push(formattedLine);
+      }
+    }
+  );
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  /*
+   * 言語ごとに改行し、
+   * Toブロックと本文の間に空行を入れる。
+   */
+  return lines.join('\n') + '\n\n';
+}
+
+
+/**
+ * getTeamsTosの結果からCW_IDを取得し、
+ * メンバーデータの「呼び方」で表示する。
+ *
+ * getTeamsTosが1行形式でも複数行形式でも対応する。
+ */
+function formatAutomaticTosUsingMembers_20260728V2_(
+  tos,
+  botKun,
+  usedCwIds
+) {
+  if (
+    tos == null ||
+    String(tos).trim() === ''
+  ) {
+    return '';
+  }
+
+  if (
+    !botKun ||
+    !botKun.cw ||
+    !botKun.cw.members ||
+    typeof botKun.cw.members.get !== 'function'
+  ) {
+    console.warn(
+      'botKun.cw.members.getが使用できません。'
+    );
+
+    return String(tos);
+  }
+
+  const tosString =
+    String(tos);
+
+  /*
+   * [To:123456]をすべて取得する。
+   * Chatwork名の形式には依存しない。
+   */
+  const toPattern =
+    /\[To:(\d+)\]/g;
+
+  const cwIds = [];
+  let match;
+
+  while (
+    (match = toPattern.exec(tosString)) !== null
+  ) {
+    const cwId =
+      String(match[1]);
+
+    /*
+     * 同じ言語内での重複を防止する。
+     */
+    if (!cwIds.includes(cwId)) {
+      cwIds.push(cwId);
+    }
+  }
+
+  if (cwIds.length === 0) {
+    console.warn(
+      'getTeamsTosの結果からCW_IDを取得できませんでした。',
+      tosString
+    );
+
+    return '';
+  }
+
+  return cwIds
+    .map(function (cwId) {
+      /*
+       * 他の言語行ですでに出力済みの場合は除外する。
+       */
+      if (usedCwIds[cwId]) {
+        return '';
+      }
+
+      let member = null;
+
+      /*
+       * ChatWorkMembers.getは数値・文字列の双方に対応しているが、
+       * まず数値で検索する。
+       */
+      try {
+        member =
+          botKun.cw.members.get(
+            Number(cwId)
+          );
+      }
+      catch (error) {
+        console.warn(
+          `CW_ID「${cwId}」の検索中にエラーが発生しました。`,
+          error
+        );
+      }
+
+      /*
+       * キャッシュ上で見つからなかった場合は、
+       * safeGetが使用可能なら再取得する。
+       */
+      if (
+        !member &&
+        typeof botKun.cw.members.safeGet ===
+          'function'
+      ) {
+        try {
+          member =
+            botKun.cw.members.safeGet(
+              Number(cwId)
+            );
+        }
+        catch (error) {
+          console.warn(
+            `CW_ID「${cwId}」の再取得に失敗しました。`,
+            error
+          );
+        }
+      }
+
+      let nickname = '';
+
+      if (
+        member &&
+        member['呼び方'] != null
+      ) {
+        nickname =
+          String(
+            member['呼び方']
+          ).trim();
+      }
+
+      usedCwIds[cwId] = true;
+
+      if (nickname === '') {
+        console.warn(
+          `CW_ID「${cwId}」の呼び方を取得できませんでした。`
+        );
+
+        /*
+         * 呼び方がなくてもTo自体は維持する。
+         */
+        return `[To:${cwId}]`;
+      }
+
+      console.log(
+        'MEMBER NICKNAME MATCHED:',
+        {
+          cwId: cwId,
+          nickname: nickname,
+          team:
+            member &&
+            member['チーム'] != null
+              ? member['チーム']
+              : ''
+        }
+      );
+
+      return `[To:${cwId}]${nickname}`;
+    })
+    .filter(function (toText) {
+      return toText !== '';
+    })
+    .join(' ');
+}
+
+
+/**
+ * 標準のmakeTenkaiParamsが付与した、
+ * message先頭の自動To部分だけを削除する。
+ *
+ * 本文途中のToには触れない。
+ */
+function removeLeadingAutomaticTos_20260728V2_(
+  message
+) {
+  if (message == null) {
+    return '';
+  }
+
+  const originalMessage =
+    String(message);
+
+  const lines =
+    originalMessage.split(/\r?\n/);
+
+  let index = 0;
+  let foundTo = false;
+
+  while (index < lines.length) {
+    const trimmedLine =
+      String(lines[index]).trim();
+
+    /*
+     * 先頭の空行は読み飛ばす。
+     */
+    if (trimmedLine === '') {
+      index++;
+      continue;
+    }
+
+    /*
+     * 先頭から連続しているTo行を削除する。
+     *
+     * 1行内に複数のToがある場合も、
+     * 行頭が[To:ID]ならTo行として扱う。
+     */
+    if (
+      /^\[To:\d+\]/.test(
+        trimmedLine
+      )
+    ) {
+      foundTo = true;
+      index++;
+      continue;
+    }
+
+    /*
+     * 本文に到達したら終了。
+     */
+    break;
+  }
+
+  /*
+   * 先頭に自動Toがなかった場合は、
+   * 元のmessageをそのまま返す。
+   */
+  if (!foundTo) {
+    return originalMessage;
+  }
+
+  return lines
+    .slice(index)
+    .join('\n')
+    .replace(/^\n+/, '');
 }

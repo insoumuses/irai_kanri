@@ -12,16 +12,23 @@ function getTenkaiParams () {
   if (parameters.tasks && Array.isArray(parameters.tasks)) {
     parameters.tasks.forEach(task => {
       if (task.message) {
+        let prevLang = null
+
         task.message = task.message
-        .replace(/^/, ' ')
-        .replace(/WO.*?(?=_(?:EN|ES|DE|FR|TC|KR|IT|SC|PT)|お疲れ様です|$)/g, '')//WO ~ _XX or お疲れ様です
-        .replace(/(_(?:EN|ES|DE|FR|TC|KR|IT|SC|PT)+)[\s\S]*?(?=\[To:)/g, '$1')//_XX ~ [To:
-        .replace(/(\[To:[^\]]+\]_(\w+))(?=\[To:[^\]]+\]_(\w+))/g,
-                 (match, first, lang1, lang2) => lang1 !== lang2 ? first + '/' : first
-                )//_xx連続しない場合、/
-        .replace(/_(?:EN|ES|DE|FR|TC|KR|IT|SC|PT)+/g, '')
-        .replace(/お疲れ様です/g, '\nお疲れ様です')
-                        }
+          // 各行を処理
+          .replace(
+            /\[To:(\d+)\]WO\s*(.+?)_(EN|ES|DE|FR|TC|KR|IT|SC|PT)[^\n]*/g,
+            (match, id, name, lang) => {
+              let prefix = ''
+              if (prevLang !== null && lang !== prevLang) {
+                prefix = '\n' // 言語切替時に改行を挿入
+              }
+              prevLang = lang
+              return `${prefix}[To:${id}] ${name.trim()}`
+            }
+          )
+          .replace(/お疲れ様です/g, '\nお疲れ様です')
+      }
     })
   }
 

@@ -28,22 +28,21 @@ function getTenkaiParams () {
             break
           }
 
-          // 括弧内ニックネームあり → 出力対象
-          const match = line.match(/^\[To:(\d+)\]WO\s*.*?[（(]([^）)]+)[）)].*?_(EN|ES|DE|FR|TC|KR|IT|SC|PT)/)
-          if (match) {
-            const [, id, nickname, lang] = match
+          // IDと言語コードだけ抽出（ニックネーム不要）
+          const match = line.match(/^\[To:(\d+)\].*?_(EN|ES|DE|FR|TC|KR|IT|SC|PT)/)
+          if (!match) continue
 
-            if (prevLang !== null && lang !== prevLang) {
-              if (currentGroup.length > 0) {
-                langGroups.push(currentGroup.join(' '))
-                currentGroup = []
-              }
+          const [, id, lang] = match
+
+          if (prevLang !== null && lang !== prevLang) {
+            if (currentGroup.length > 0) {
+              langGroups.push(currentGroup.join(' '))
+              currentGroup = []
             }
-
-            currentGroup.push(`[To:${id}]${nickname.trim()}`)
-            prevLang = lang
           }
-          // 括弧なし → スキップ（でもループは続ける）
+
+          currentGroup.push(`[To:${id}]`)
+          prevLang = lang
         }
 
         if (currentGroup.length > 0) {

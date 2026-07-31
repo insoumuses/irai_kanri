@@ -1,13 +1,1 @@
-BotKunが"jpHolidays"を見つけました！
-18:31:45	デバッグ	Loading "jpHolidays": 148ms
-18:31:45	情報	BotKunが"cw_members"を見つけました！
-18:31:45	デバッグ	Loading "cw_members": 138ms
-18:31:45	情報	BotKunが"cw_rooms"を見つけました！
-18:31:45	デバッグ	Loading "cw_rooms": 93ms
-18:31:45	警告	BotKun Summoned
-18:31:45	デバッグ	botKun load: 387ms
-18:31:45	情報	Loading new project...
-18:31:46	情報	"pj_config" found by BotKun!
-18:31:46	デバッグ	Loading "pj_config": 165ms
-18:31:46	警告	Fast定常 loaded!
-18:31:46	デバッグ	project loaded in : 169ms
+{"params":{"dataSsUrl":"https://docs.google.com/spreadsheets/d/1zr8Vtk5907bohi-qlR6Wr8p1dCiC8CZ0R9GS5RarqcU/","shiftSsUrl":"https://docs.google.com/spreadsheets/d/1upjFhFqjJw8OE-WXxZhgfnHf8co5Amns12Tz-wDc4WU/"},"stored":[{"呼び方":"ヘヨン","シフト名":"姜　恵英","グループ":"管理","チーム":"サポート","サブチーム":null,"ポジション":"メンバー","CW_ID":596325,"TS名":"姜 恵英","出勤設定":"R","出勤中":true,"入社日":"2013-01-22T15:00:00.000Z","退社日":null,"言語コード":"ASID","cw_name":"WO 姜 恵英 (ヘヨン)_LOD_7/31 12時以降不在","direct_room":184651126},{"呼び方":"呂","シフト名":"呂　宗

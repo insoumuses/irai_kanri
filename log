@@ -1,1 +1,69 @@
-{"params":{"dataSsUrl":"https://docs.google.com/spreadsheets/d/1zr8Vtk5907bohi-qlR6Wr8p1dCiC8CZ0R9GS5RarqcU/","shiftSsUrl":"https://docs.google.com/spreadsheets/d/1upjFhFqjJw8OE-WXxZhgfnHf8co5Amns12Tz-wDc4WU/"},"stored":[{"呼び方":"ヘヨン","シフト名":"姜　恵英","グループ":"管理","チーム":"サポート","サブチーム":null,"ポジション":"メンバー","CW_ID":596325,"TS名":"姜 恵英","出勤設定":"R","出勤中":true,"入社日":"2013-01-22T15:00:00.000Z","退社日":null,"言語コード":"ASID","cw_name":"WO 姜 恵英 (ヘヨン)_LOD_7/31 12時以降不在","direct_room":184651126},{"呼び方":"呂","シフト名":"呂　宗
+// create messages
+// function called from the client side (see clientScript)
+function getTenkaiParams () {
+  console.warn('LOADING TENKAI PARAMS');
+  console.time('Loading message');
+
+  let botKun = BotKun.summon(magicIncantation)
+  botKun.loadProject()
+
+  let parameters = botKun.pj.tenkai.makeTenkaiParams(3)
+
+  // CW_ID → 呼び方 のマップを作成
+  const nicknameMap = {}
+  botKun.cw.members.stored.forEach(member => {
+    if (member.CW_ID && member['呼び方']) {
+      nicknameMap[String(member.CW_ID)] = member['呼び方']
+    }
+  })
+
+  if (parameters.tasks && Array.isArray(parameters.tasks)) {
+    parameters.tasks.forEach(task => {
+      if (task.message) {
+        const lines = task.message.split('\n')
+
+        let prevLang = null
+        const langGroups = []
+        let currentGroup = []
+        let bodyStartIndex = 0
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i]
+
+          if (!line.startsWith('[To:')) {
+            bodyStartIndex = i
+            break
+          }
+
+          const match = line.match(/^\[To:(\d+)\].*?_(EN|ES|DE|FR|TC|KR|IT|SC|PT)/)
+          if (!match) continue
+
+          const [, id, lang] = match
+          const nickname = nicknameMap[id] || ''
+
+          if (prevLang !== null && lang !== prevLang) {
+            if (currentGroup.length > 0) {
+              langGroups.push(currentGroup.join(' '))
+              currentGroup = []
+            }
+          }
+
+          currentGroup.push(`[To:${id}]${nickname}`)
+          prevLang = lang
+        }
+
+        if (currentGroup.length > 0) {
+          langGroups.push(currentGroup.join(' '))
+        }
+
+        const body = lines.slice(bodyStartIndex).join('\n')
+        task.message = langGroups.join('\n') + '\n' + body
+      }
+    })
+  }
+
+  console.log(parameters)
+
+  console.timeEnd('Loading message')
+  return JSON.stringify(parameters)
+}

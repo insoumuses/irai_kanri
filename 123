@@ -12,14 +12,21 @@ function getTenkaiParams () {
   if (parameters.tasks && Array.isArray(parameters.tasks)) {
     parameters.tasks.forEach(task => {
       if (task.message) {
+        const lines = task.message.split('\n')
+
         let prevLang = null
         const langGroups = []
         let currentGroup = []
+        let bodyStartIndex = 0
 
-        const lines = task.message.split('\n')
-        lines.forEach(line => {
-          const match = line.match(/^\[To:(\d+)\]WO\s*.*?[（(]([^）)]+)[）)].*?_(EN|ES|DE|FR|TC|KR|IT|SC|PT)/)
-          if (!match) return // 括弧なし（DE・FRなど）はスキップ
+        // [To:] 行だけ処理、それ以外は bodyStartIndex を記録
+        for (let i = 0; i < lines.length; i++) {
+          const match = lines[i].match(/^\[To:(\d+)\]WO\s*.*?[（(]([^）)]+)[）)].*?_(EN|ES|DE|FR|TC|KR|IT|SC|PT)/)
+
+          if (!match) {
+            bodyStartIndex = i
+            break
+          }
 
           const [, id, nickname, lang] = match
 
@@ -32,13 +39,15 @@ function getTenkaiParams () {
 
           currentGroup.push(`[To:${id}]${nickname.trim()}`)
           prevLang = lang
-        })
+        }
 
         if (currentGroup.length > 0) {
           langGroups.push(currentGroup.join(' '))
         }
 
-        task.message = langGroups.join('\n') + '\nお疲れ様です！'
+        // [To:] 部分 + 元の本文をそのまま結合
+        const body = lines.slice(bodyStartIndex).join('\n')
+        task.message = langGroups.join('\n') + '\n' + body
       }
     })
   }
